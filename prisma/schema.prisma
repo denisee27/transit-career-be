@@ -1,0 +1,263 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Tier {
+  FREE
+  PREMIUM
+  ADMIN
+}
+
+enum JobCategory {
+  TECH
+  DESIGN
+  WRITING
+  ADMIN
+  FINANCE
+  MARKETING
+  OTHER
+}
+
+enum WorkType {
+  REMOTE
+  RELOCATION
+}
+
+enum PathType {
+  WHV_AUSTRALIA
+  AUSBILDUNG_GERMANY
+}
+
+enum NoteType {
+  DO
+  DONT
+  COST
+  WARNING
+}
+
+enum AssetCategory {
+  ATS_CV_TEMPLATE
+  REMOTE_JOB_TOOLKIT
+  GLOBAL_VISA_KIT
+}
+
+enum InterviewType {
+  BEHAVIORAL
+  REMOTE_ASYNC
+  VISA_IMMIGRATION
+}
+
+enum ExperienceLevel {
+  JUNIOR
+  MID
+  SENIOR
+}
+
+enum EmployerRegion {
+  US
+  EU
+  APAC
+  GLOBAL_REMOTE
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  EXPIRED
+}
+
+model User {
+  id               String    @id @default(uuid())
+  email            String    @unique
+  name             String?
+  avatar           String?
+  password         String?
+  tier             Tier      @default(FREE)
+  premiumExpiresAt DateTime? @map("premium_expires_at")
+  googleId         String?   @unique @map("google_id")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  refreshTokens RefreshToken[]
+  sessions      Session[]
+  payments      Payment[]
+  progress      UserProgress[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id         String   @id @default(uuid())
+  token      String   @unique
+  userId     String   @map("user_id")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceInfo String?  @map("device_info")
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("refresh_tokens")
+}
+
+model Session {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceInfo String?  @map("device_info")
+  lastActive DateTime @default(now()) @map("last_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("sessions")
+}
+
+model MagicLink {
+  id        String   @id @default(uuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("magic_links")
+}
+
+model Job {
+  id                   String      @id @default(uuid())
+  companyName          String      @map("company_name")
+  companyLogo          String?     @map("company_logo")
+  title                String
+  category             JobCategory
+  workType             WorkType    @map("work_type")
+  country              String
+  timezone             String?
+  salaryMin            Float?      @map("salary_min")
+  salaryMax            Float?      @map("salary_max")
+  salaryCurrency       String?     @default("USD") @map("salary_currency")
+  isIndonesianFriendly Boolean     @default(false) @map("is_indonesian_friendly")
+  applicationUrl       String      @map("application_url")
+  isActive             Boolean     @default(true) @map("is_active")
+  linkBroken           Boolean     @default(false) @map("link_broken")
+  createdAt            DateTime    @default(now()) @map("created_at")
+  updatedAt            DateTime    @updatedAt @map("updated_at")
+
+  @@map("jobs")
+}
+
+model RoadmapPath {
+  id     String   @id @default(uuid())
+  type   PathType @unique
+  title  String
+  phases Phase[]
+
+  @@map("roadmap_paths")
+}
+
+model Phase {
+  id          String      @id @default(uuid())
+  pathId      String      @map("path_id")
+  path        RoadmapPath @relation(fields: [pathId], references: [id])
+  order       Int
+  title       String
+  description String?
+  isFree      Boolean     @default(false) @map("is_free")
+  notes       PhaseNote[]
+  tasks       Task[]
+
+  @@map("phases")
+}
+
+model Task {
+  id      String         @id @default(uuid())
+  phaseId String         @map("phase_id")
+  phase   Phase          @relation(fields: [phaseId], references: [id])
+  order   Int
+  title   String
+  progress UserProgress[]
+
+  @@map("tasks")
+}
+
+model PhaseNote {
+  id      String    @id @default(uuid())
+  phaseId String    @map("phase_id")
+  phase   Phase     @relation(fields: [phaseId], references: [id])
+  type    NoteType
+  content String
+
+  @@map("phase_notes")
+}
+
+model UserProgress {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskId      String    @map("task_id")
+  task        Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  completed   Boolean   @default(false)
+  completedAt DateTime? @map("completed_at")
+
+  @@unique([userId, taskId])
+  @@map("user_progress")
+}
+
+model Asset {
+  id          String        @id @default(uuid())
+  title       String
+  category    AssetCategory
+  format      String
+  description String
+  fileUrl     String?       @map("file_url")
+  notionUrl   String?       @map("notion_url")
+  isActive    Boolean       @default(true) @map("is_active")
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  @@map("assets")
+}
+
+model InterviewQuestion {
+  id             String        @id @default(uuid())
+  type           InterviewType
+  question       String
+  intent         String
+  strategy       String        @db.Text
+  sampleResponse String        @db.Text @map("sample_response")
+  isFree         Boolean       @default(false) @map("is_free")
+  order          Int?
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  @@map("interview_questions")
+}
+
+model SalaryRange {
+  id              String          @id @default(uuid())
+  category        String
+  level           ExperienceLevel
+  region          EmployerRegion
+  minUsd          Float           @map("min_usd")
+  maxUsd          Float           @map("max_usd")
+  negotiationNote String?         @map("negotiation_note")
+
+  @@map("salary_ranges")
+}
+
+model Payment {
+  id        String        @id @default(uuid())
+  userId    String        @map("user_id")
+  user      User          @relation(fields: [userId], references: [id])
+  amount    Float
+  currency  String        @default("IDR")
+  status    PaymentStatus @default(PENDING)
+  qrisCode  String?       @map("qris_code") @db.Text
+  expiresAt DateTime?     @map("expires_at")
+  paidAt    DateTime?     @map("paid_at")
+  orderId   String?       @unique @map("order_id")
+  createdAt DateTime      @default(now()) @map("created_at")
+
+  @@map("payments")
+}
